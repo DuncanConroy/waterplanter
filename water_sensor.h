@@ -2,11 +2,13 @@
 #define WaterSensor_h
 
 #include <Arduino.h>
+#include "logger.h"
 
 class WaterSensor
 {
   public:
-    WaterSensor(int sensorPin,
+    WaterSensor(Logger logger,
+                int sensorPin,
                 int LEDPin,
                 int MOSFETPin,
                 int durationCalibration,
@@ -22,6 +24,7 @@ class WaterSensor
     int doRead();
     void invalidateSensors();
     int calculateThreshold();
+    Logger _logger;
     int pinLED;
     int pinSensor;
     int pinMOSFET;

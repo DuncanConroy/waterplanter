@@ -2,15 +2,18 @@
 #define WaterPump_h
 
 #include <Arduino.h>
+#include "logger.h"
 
 class WaterPump
 {
   public:
-    WaterPump(int LEDPin,
+    WaterPump(Logger logger,
+              int LEDPin,
               int MOSFETPin,
               int durationActivation);
     void activate();
   private:
+    Logger _logger;
     int pinLED;
     int pinMOSFET;
     int activationDuration;
