@@ -1,32 +1,33 @@
 #include <Arduino.h>
 #include "water_pump.h"
+#include "logger.h"
+#include "led.h"
 
-WaterPump::WaterPump(Logger logger,
-                     int LEDPin,
+WaterPump::WaterPump(const Logger& logger,
+                     const LED& led,
                      int MOSFETPin,
-                     int durationActivation) {
+                     int durationActivation
+                     ): _led(led) {
   _logger = logger;
-  pinLED = LEDPin;
+//  _led = led;
   pinMOSFET = MOSFETPin;
   activationDuration = durationActivation;
 
   pinMode(pinMOSFET, OUTPUT);
-  pinMode(pinLED, OUTPUT);
-  switch(0);
+  switchPump(0);
 }
 
 void WaterPump::activate()
 {
-  _logger.println("Activating pump for " + String(activationDuration / 1000) + " seconds.");
+  _logger.log("Activating pump for " + String(activationDuration / 1000) + " seconds.");
 
   switchPump(1);
   delay(activationDuration);
   switchPump(0);
 }
 
-void WaterPump::switchPump(boolean state)
+void WaterPump::switchPump(bool state)
 {
   digitalWrite(pinMOSFET, state);
-  digitalWrite(pinLED, state);
-  _logger.println("LED: " + String(state));
+  _led.toggle(state);
 }

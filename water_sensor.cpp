@@ -1,146 +1,152 @@
 #include <Arduino.h>
+#include <timer.h>
 #include "water_sensor.h"
+#include "logger.h"
+#include "led.h"
 
 #define SENSOR_MIN 0
-#define SENSOR_MAX 1000
+#define SENSOR_MAX 1023
 
-WaterSensor::WaterSensor(Logger logger,
-                         int sensorPin,
-                         int LEDPin,
-                         int MOSFETPin,
-                         int durationCalibration,
-                         int blinkDurationCalibration,
-                         float measuringPercentageThreshold)
-{
-  _logger = logger;
-  pinSensor = sensorPin;
-  pinLED = LEDPin;
-  pinMOSFET = MOSFETPin;
-  calibrationDuration = durationCalibration;
-  blinkCalibrationDuration = blinkDurationCalibration;
-  measuringThresholdPercentage = measuringPercentageThreshold;
-}
+//WaterSensor::WaterSensor(const Logger& logger,
+//                         const LED& led,
+//                         int sensorPin,
+//                         int durationCalibration,
+//                         int blinkDurationCalibration,
+//                         float measuringPercentageThreshold)
+//{
+//  _logger = logger;
+//  _led = led;
+//  pinSensor = sensorPin;
+//  calibrationDuration = durationCalibration;
+//  blinkCalibrationDuration = blinkDurationCalibration;
+//  measuringThresholdPercentage = measuringPercentageThreshold;
+//}
 
 void WaterSensor::init() {
-  pinMode(A0, INPUT);
-  pinMode(pinMOSFET, OUTPUT);
-  pinMode(pinLED, OUTPUT);
+  pinMode(pinSensor, INPUT);
   reset();
 }
 
 void WaterSensor::invalidateSensors()
 {
-  dryValue = -1;
-  wetValue = -1;
+  historyDryValue = -1;
+  historyWetValue = SENSOR_MAX;
   measuringThreshold = -1;
 }
 
 void WaterSensor::calibrate() {
+  if (calibrating) return;
   invalidateSensors();
-  boolean blinkOn = true;
-  int timeToCalibrate = calibrationDuration;
-  while(timeToCalibrate > 0) {
-    _logger.println("timeToCalibrate: " + String(timeToCalibrate));
-    digitalWrite(pinLED, blinkOn);
-    blinkOn = !blinkOn;
-    timeToCalibrate -= blinkCalibrationDuration;
-    int currentValue = doRead();
-    _logger.println("current: " + String(currentValue) +
-      ", dry: " + String(dryValue)
-      + ", wet: " + String(wetValue) 
-      + ", threshold: " + String(measuringThreshold) +
-      ", historyDry: " + String(historyDryValue) +
-      ", historyWet: " + String(historyWetValue));
-    
-    if (dryValue == -1 || dryValue > currentValue) {
-      dryValue = currentValue;
-      historyDryValue = max(historyDryValue, dryValue);
-    }
-    if (wetValue == -1 || wetValue < currentValue) {
-      wetValue = currentValue;
-      historyWetValue = min(historyWetValue, wetValue);
-    }
-    
-    measuringThreshold = calculateThreshold();
-    delay(blinkCalibrationDuration);
-  }
+  calibrationTimeLeft = calibrationDuration;
+  calibrating = true;
+
+//  calibrationTimer(this, this::internalCalibrate);
+//  calibrationTimer.setCallback(WaterSensor::internalCalibrate);
+//  calibrationTimer = new TimerForMethods<WaterSensor>(this, &WaterSensor::internalCalibrate);
+//  calibrationTimer(*this, &WaterSensor::internalCalibrate);
   
-  checkCalibrationSuccessful();
+}
+
+void WaterSensor::internalCalibrate() {
+  _logger.log("internalCalibrate");
+  
+  calibrationTimeLeft -= blinkCalibrationDuration;
+  if(calibrationTimeLeft <=0) {
+    stopCalibration();
+    return;
+  }
+
+  _led.toggle(!_led.isOn());
+  _logger.log("calibrationTimeLeft:" + String(calibrationTimeLeft));
+  _logger.log("ledOn:" + String(_led.isOn()));
+  
+  int currentValue = doRead();
+  _logger.log("current: " + String(currentValue)
+    + ", threshold: " + String(measuringThreshold)
+    + ", historyDry: " + String(historyDryValue)
+    + ", historyWet: " + String(historyWetValue));
+  
+  historyDryValue = max(historyDryValue, currentValue);
+  historyWetValue = min(historyWetValue, currentValue);
+  
+  measuringThreshold = calculateThreshold();
+}
+
+void WaterSensor::stopCalibration() {
+  calibrationTimer.pause();
+  calibrationTimer.reset();
+  calibrating = false;
+  _led.toggle(false);
+  _logger.log("calibration finished. Stopping Timer.");
+
+  if (!checkCalibrationSuccessful()) {
+    _logger.log("Calibration unsuccessful. Going back to calibration mode.");
+    reset();
+  }
 }
 
 int WaterSensor::calculateThreshold()
 {
   int diff = max(1, abs(historyDryValue - historyWetValue));
-  _logger.println("hD: "+ String(historyDryValue) + " - diff: " + String(diff) + " * mTP: " + String(measuringThresholdPercentage));
-  _logger.println("hD: "+ String(historyDryValue) + " - " + String((diff * measuringThresholdPercentage)));
+  _logger.log("hD: "+ String(historyDryValue) + " - diff: " + String(diff) + " * mTP: " + String(measuringThresholdPercentage));
+  _logger.log("hD: "+ String(historyDryValue) + " - " + String((diff * measuringThresholdPercentage)));
   int result = constrain(
       historyDryValue - ( diff * measuringThresholdPercentage),
-      historyDryValue - (SENSOR_MAX * .01), 
-      min(historyWetValue + (SENSOR_MAX * .01), 1000)
-    );
-
-    
+      min(historyWetValue + (SENSOR_MAX * .01), 0),
+      SENSOR_MAX 
+     );
          
-  _logger.println("threshold: " + String(result));
+  _logger.log("threshold: " + String(result));
   return result;
 }
 
-boolean WaterSensor::isCalibrated()
+bool WaterSensor::isCalibrated()
 {
-    return dryValue != -1 && wetValue != -1 && measuringThreshold != -1;
+  return !calibrating && historyDryValue != -1 && historyWetValue != SENSOR_MAX && measuringThreshold != -1;
 }
 
-void WaterSensor::checkCalibrationSuccessful() {
-  if (dryValue == wetValue) {
-    dryValue = -1;
-    wetValue = -1;
-    measuringThreshold = -1;
+bool WaterSensor::checkCalibrationSuccessful() {
+  int diff = abs(historyDryValue - historyWetValue);
+  if (diff < 100) {
+    invalidateSensors();
+    
+    return false;
   }
+
+  return true;
 }
 
-boolean WaterSensor::needsWatering()
-{
-  if (measuringThreshold < 10) {
-    calibrate();
-    return;
-  }
-  
+bool WaterSensor::needsWatering()
+{  
   int analogWaterSensorValue = doRead();
-  _logger.println("analog:" + String(analogWaterSensorValue) + ", activationThreshold: " + String(measuringThreshold));
+  _logger.log("analog:" + String(analogWaterSensorValue) + ", activationThreshold: " + String(measuringThreshold));
   
   // high sensor value means little conductivity -> dry soil
   return analogWaterSensorValue >= measuringThreshold;
 }
 
 int WaterSensor::doRead()
-{
-  digitalWrite(pinMOSFET, 1);
-  delay(500);
+{;
   int i = 0;
   unsigned long int readValues = 0l;
-  int iterations = 30; //should be max 32, because of a short overflow
+  int iterations = 30; //should be max 32, because of SHORT overflow
   int currentValue = 0;
   while(i++ < iterations){
     currentValue = analogRead(pinSensor);
     readValues += currentValue;
-    char buffer [20];
-    sprintf(buffer, "current: %d, readValues: %d", currentValue, readValues);
-    _logger.println(buffer);
+//    char buffer [20];
+//    sprintf(buffer, "current: %d, readValues: %d", currentValue, (int) readValues);
+//    _logger.log(buffer);
   }
   int sensorValue = readValues / iterations;
-  _logger.println(String(readValues) +"/"+ String(iterations) +"="+ sensorValue);
-  _logger.println(":>>>" + String(sensorValue));
-  delay(500);
-  digitalWrite(pinMOSFET, 0);
+  _logger.log(String(readValues) +"/"+ String(iterations) +"="+ sensorValue);
+  
   return sensorValue;
 }
 
 void WaterSensor::reset()
 {
-  _logger.println("RESET");
-  
-  historyDryValue = -1;
-  historyWetValue = 1000;
+  _logger.log("RESET");
   
   invalidateSensors();
   calibrate();

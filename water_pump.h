@@ -3,21 +3,22 @@
 
 #include <Arduino.h>
 #include "logger.h"
+#include "led.h"
 
 class WaterPump
 {
   public:
-    WaterPump(Logger logger,
-              int LEDPin,
+    WaterPump(const Logger& logger,
+              const LED& led,
               int MOSFETPin,
               int durationActivation);
     void activate();
   private:
-    Logger _logger;
-    int pinLED;
+    Logger& _logger;
+    const LED& _led;
     int pinMOSFET;
     int activationDuration;
-    void switchPump(boolean state);
+    void switchPump(bool state);
 };
 
 #endif

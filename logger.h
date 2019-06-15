@@ -6,9 +6,7 @@
 class Logger {
   public:
     Logger(bool productionMode);
-    void println(const char[]);
-    void println(const String &value);
-    void println(int* value);
+    void log(String value);
   private:
     bool _productionMode;
 };
