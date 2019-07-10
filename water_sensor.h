@@ -35,6 +35,7 @@ class WaterSensor
   private:
     bool checkCalibrationSuccessful();
     int doRead();
+    int updateValues();
     void invalidateSensors();
     void internalCalibrate();
     void stopCalibration();

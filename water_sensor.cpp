@@ -59,7 +59,11 @@ void WaterSensor::internalCalibrate() {
   _led.toggle(!_led.isOn());
   _logger.log("calibrationTimeLeft:" + String(calibrationTimeLeft));
   _logger.log("ledOn:" + String(_led.isOn()));
-  
+
+  updateValues();
+}
+
+int WaterSensor::updateValues() {
   int currentValue = doRead();
   _logger.log("current: " + String(currentValue)
     + ", threshold: " + String(measuringThreshold)
@@ -70,6 +74,8 @@ void WaterSensor::internalCalibrate() {
   historyWetValue = min(historyWetValue, currentValue);
   
   measuringThreshold = calculateThreshold();
+
+  return currentValue;
 }
 
 void WaterSensor::stopCalibration() {
@@ -118,8 +124,7 @@ bool WaterSensor::checkCalibrationSuccessful() {
 
 bool WaterSensor::needsWatering()
 {  
-  int analogWaterSensorValue = doRead();
-  _logger.log("analog:" + String(analogWaterSensorValue) + ", activationThreshold: " + String(measuringThreshold));
+  int analogWaterSensorValue = updateValues();
   
   // high sensor value means little conductivity -> dry soil
   return analogWaterSensorValue >= measuringThreshold;

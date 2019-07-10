@@ -13,7 +13,7 @@
 #define WATER_ACTIVATION_DURATION 10000
 #define BLINK_DURATION_CALIBRATION 100
 #define CALIBRATION_DURATION 30000
-#define MEASURING_THRESHOLD_PERCENTAGE .2
+#define MEASURING_THRESHOLD_PERCENTAGE .9
 #define MEASURING_INTERVAL 1000//5 * 60 * 1000;
 //#define PRODUCTION_MODE true
 
@@ -28,7 +28,7 @@ void setup() {
   Logger logger(false);
   #endif
 
-  led = new LED(logger, LED_BUILTIN);//LED_PIN);
+  led = new LED(logger, LED_PIN);
   
   pump = new WaterPump(logger,
                        *led,
