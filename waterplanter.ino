@@ -50,10 +50,10 @@ void loop() {
   //Update all the timers at once
   TimerManager::instance().update();
   
-  if (!waterSensor->isCalibrated()) {
-    waterSensor->calibrate();
-    return;
-  }
+//  if (!waterSensor->isCalibrated()) {
+//    waterSensor->calibrate();
+//    return;
+//  }
 
   delay(MEASURING_INTERVAL);
   

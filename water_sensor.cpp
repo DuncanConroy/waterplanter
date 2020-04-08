@@ -6,6 +6,10 @@
 
 #define SENSOR_MIN 0
 #define SENSOR_MAX 1023
+/*  The automatic sensor calibration is far too cumbersome, by forcing the user to remove and put back
+ *  the sensors every time the device lost power. So let's just set a default fixed value.
+*/
+#define SENSOR_FIXED_THRESHOLD 600
 
 //WaterSensor::WaterSensor(const Logger& logger,
 //                         const LED& led,
@@ -31,7 +35,7 @@ void WaterSensor::invalidateSensors()
 {
   historyDryValue = -1;
   historyWetValue = SENSOR_MAX;
-  measuringThreshold = -1;
+  measuringThreshold = SENSOR_FIXED_THRESHOLD;
 }
 
 void WaterSensor::calibrate() {
@@ -73,7 +77,7 @@ int WaterSensor::updateValues() {
   historyDryValue = max(historyDryValue, currentValue);
   historyWetValue = min(historyWetValue, currentValue);
   
-  measuringThreshold = calculateThreshold();
+//  measuringThreshold = calculateThreshold();
 
   return currentValue;
 }
@@ -131,7 +135,7 @@ bool WaterSensor::needsWatering()
 }
 
 int WaterSensor::doRead()
-{;
+{
   int i = 0;
   unsigned long int readValues = 0l;
   int iterations = 30; //should be max 32, because of SHORT overflow
@@ -154,5 +158,5 @@ void WaterSensor::reset()
   _logger.log("RESET");
   
   invalidateSensors();
-  calibrate();
+//  calibrate();
 }
